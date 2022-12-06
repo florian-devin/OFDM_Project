@@ -15,10 +15,17 @@ clc;
 % Configuration Values
 conf.audiosystem = 'bypass'; % Values: 'matlab','native','bypass'
 
+% OFDM 
+conf.nbcarriers = 256;
+conf.carriersSpacing = 5; % Hz
+conf.cp_length = conf.nbcarriers / 2;
+
 conf.f_s     = 48000;   % sampling rate  
 conf.f_sym   = 100;     % symbol rate
+conf.rolloff = 0.22;
+conf.filterlength = 20;
 conf.nframes = 1;       % number of frames to transmit
-conf.nbits   = 2000;    % number of bits 
+conf.nbits   = 4*conf.nbcarriers*2;    % number of bits 
 conf.modulation_order = 2; % BPSK:1, QPSK:2
 conf.f_c     = 4000;
 
@@ -26,14 +33,12 @@ conf.npreamble  = 256;
 conf.bitsps     = 16;   % bits per audio sample
 conf.offset     = 0;
 
-% OFDM 
-conf.nbcarriers = 256;
-conf.carriersSpacing = 5; % Hz
 
 % Init Section
 % all calculations that you only have to do once
-conf.os_factor  = conf.f_s/conf.f_sym;
-if mod(conf.os_factor,1) ~= 0
+conf.os_factor_ofdm  = conf.f_s/conf.carriersSpacing/conf.nbcarriers;
+conf.os_factor_preambul = conf.f_s/conf.f_sym;
+if mod(conf.os_factor_preambul,1) ~= 0
    disp('WARNING: Sampling rate must be a multiple of the symbol rate'); 
 end
 conf.nsyms      = ceil(conf.nbits/conf.modulation_order);

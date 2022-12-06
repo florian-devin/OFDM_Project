@@ -34,57 +34,39 @@ if (conf.modulation_order == 2)
     tx_symbols(txbits(1:2:end) == 0 & txbits(2:2:end) == 1) = -1/sqrt(2) + 1i/sqrt(2);
 end
 
-%%%%% Add preambule
-%tx_symbols = cat(1, preamble_bpsk, tx_symbols);
-%tx_symbols_upsampled = zeros(length(tx_symbols)*5, 1);
-%for ii = 1:length(tx_symbols)
-%    tx_symbols_upsampled(5*ii) = tx_symbols(ii);
-%end
-
 
 %%% OFDM
-% IFFT
-ofdm_ifft_training = osifft(preamble_bpsk, conf.os_factor);
+% Training symbols insertion
+tx_symbols =  reshape(tx_symbols,[conf.nbcarriers 4]); %TODO change 4 by a variable
+tx_symbols =  [preamble_bpsk, tx_symbols]; %TODO Maybe change this preamble_bpsk
 
-% Add CP to OFDM training
-ofdm_ifft_training_cp = cat(1,ofdm_ifft_training(end-(length(ofdm_ifft_training)/2):end), ofdm_ifft_training);
-
-% Add CP
-ofdm_tx_signal = zeros(conf.nbcarriers, round(length(tx_symbols_upsampled)/conf.nbcarriers));
-
-% translate data into ofdm
-
-for symbol_idx = 1:length(tx_symbols)/conf.nbcarriers
-    ofdm_symbol = osifft(tx_symbols(symbol_idx*conf.nbcarriers-conf.nbcarriers:symbol_idx*conf.nbcarriers), conf.os_factor);
-    ofdm_symbol_cp = cat(1,ofdm_tx_signal(end-(length(ofdm_tx_signal)/2):end), ofdm_tx_signal);
-    
-
-
-
-for ii = 1:length(tx_symbols_upsampled)/conf.nbcarriers 
-    ofdm_tx_signal(:,ii) = tx_symbols_upsampled(conf.nbcarriers*(ii-1)+1:conf.nbcarriers*(ii));
-
+ofdm_symbol = zeros((conf.nbcarriers + conf.cp_length)*conf.os_factor_ofdm,size(tx_symbols,2));
+for symbol_idx = 1 : size(tx_symbols, 2)
+    ofdm_symbol(conf.os_factor_ofdm*conf.cp_length+1:end,symbol_idx) = osifft(tx_symbols(:,symbol_idx),conf.os_factor_ofdm);
+    ofdm_symbol(1:conf.os_factor_ofdm*conf.cp_length,symbol_idx) = ofdm_symbol(end-conf.os_factor_ofdm*conf.cp_length+1:end,symbol_idx);
 end
 
-cp_length = round(size(ofdm_tx_signal,2)/2);
-cp = ofdm_tx_signal(:,end-cp_length+1:end);
-ofdm_tx_signal_cp = zeros(conf.nbcarriers, size(ofdm_tx_signal,2)+cp_length);
+ofdm_symbol = ofdm_symbol(:);
 
 
-ofdm_tx_signal_cp = cat(2, cp, ofdm_tx_signal);
+pulse = rrc(conf.os_factor_preambul, conf.rolloff,conf.filterlength);
+preamble_filtered = conv(upsample(preamble_bpsk, conf.os_factor_preambul), pulse, 'same');
+%Add preambule BPSK to ofdm signal
+txsignal = [preamble_filtered/sqrt(mean(abs(preamble_filtered).^2)); ofdm_symbol/sqrt(mean(abs(ofdm_symbol).^2))];
+
+%Modulation
+t = 0:1/conf.f_s: (length(txsignal) - 1)/conf.f_s;
+txsignal = real(txsignal .* exp(1j*2*pi*conf.f_c*t'));
 
 
- 
+% plots
+figure('name','txsignal');
+f = - conf.f_s/2 : conf.f_s/length(txsignal) : conf.f_s/2 - conf.f_s/length(txsignal);
+plot(f,abs(fftshift(fft(txsignal))))
+grid on
+title('Transmitted signal - FFT','interpreter','latex','FontSize',16);
+xlabel('frequency/Hz','interpreter','latex','FontSize',16);
+ylabel('amplitude','interpreter','latex','FontSize',16);
+xline(conf.f_c,'--r'); xline(- conf.f_c,'--r');
 
 
-%%% filter
-%rolloff = 0.22;
-%pulse = rrc( conf.os_factor, rolloff, 20);
-
-%filtered_tx_signal = conv(tx_symbols_upsampled, pulse, 'full');
-
-%  modulation
-time = 1:1/length(filtered_tx_signal):4;
-tx_signal_modulated = real(filtered_tx_signal * exp(1i*2*pi*conf.f_c*time));
-
-txsignal = tx_signal_modulated;
