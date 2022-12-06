@@ -32,11 +32,10 @@ rxsignal_filtered = reshape(rxsignal_filtered, [conf.os_factor_ofdm*(conf.nbcarr
 rxsignal_filtered(1:conf.os_factor_ofdm*conf.cp_length,:) = [];
 
 %OFDM demod
-%TODO debug this part
 for data_idx = 1:conf.nbdatapertrainning
     rxsignal_filtered(:,data_idx) = osfft(rxsignal_filtered(:,data_idx), conf.os_factor_ofdm);
 end
-%Channel estimation
+%Channel 
 
 % rxsignal_filtered = rxsignal_shifted;
 % downsampled_rxsignal = rxsignal_filtered(5:5:end);
