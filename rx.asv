@@ -18,14 +18,15 @@ function [rxbits conf] = rx(rxsignal,conf,k)
 %Demodulate
 rxsignal = demodulate(rxsignal, conf);
 
-% OFDM lowpass filter % TODO understand why we use a lowpass filter
+% OFDM lowpass filter
 f_corner = 1.05*conf.bandwidth; % The size of the filter is a little bit biger than the signal windows (5% here)
 rxsignal_filtered = 2 * ofdmlowpass(rxsignal, conf, f_corner);
 
 % Frame syncronisation
 %TODO remplace by this line : start_idx = frame_sync(rxsignal_filtered, conf);
 start_idx = conf.f_s+1 + conf.npreamble;
-rx_size = (conf.nbdatapertrainning+1) * conf.os_factor_ofdm * conf.nbcarriers * (conf.cp_length / conf.nbcarriers + 1);
+%rx_size = (conf.nbdatapertrainning+1) * conf.os_factor_ofdm * conf.nbcarriers * (conf.cp_length / conf.nbcarriers + 1);
+rx_size = (conf.nbcarriers*conf.os_factor_ofdm*conf.nbtraining*(conf.nbdatapertrainning+1)*(1+conf.cp_length/conf.nbcarriers));
 rxsignal_filtered = rxsignal_filtered(start_idx:start_idx+rx_size-1);
 
 rxsignal_filtered = reshape(rxsignal_filtered, [conf.os_factor_ofdm*(conf.nbcarriers+conf.cp_length), conf.nbdatapertrainning+1]);
@@ -37,10 +38,9 @@ rxsignal_filtered(1:conf.os_factor_ofdm*conf.cp_length,:) = [];
 for data_idx = 1:conf.nbdatapertrainning+1 % +1 because of the training 
     rxsymbol(:,data_idx) = osfft(rxsignal_filtered(:,data_idx), conf.os_factor_ofdm);
 end
-disp('Rx first QPSK symbol')
-rxsymbol(1,2)
 
-if (conf.plotfig == 'yes')
+
+if (conf.plotfig == 1)
     figure;
     plot(real(rxsymbol(:,1)),imag(rxsymbol(:,1)), 'o');
     title('Received training Symbols (BPSK)');
@@ -49,7 +49,10 @@ end
 % Channel estimation
 switch conf.estimationtype
     case 'none'
-        rxsymbol(:,1) = []; %remove training seq
+        for block = 0:conf.nbtraining-1
+            block_idx = block*conf.nbdatapertrainning+1
+            rxsymbol(:,block_idx) = []; %remove training seq
+        end
         rxdata = rxsymbol;
     case 'block'
         H_hat = rxsymbol(:,1)./conf.trainingseq;
@@ -65,7 +68,7 @@ end
 
 rxdata = rxdata(:);
 
-if (conf.plotfig == 'yes')
+if (conf.plotfig == 1)
     figure;
     plot(real(rxdata),imag(rxdata), 'o');
     title('Received Symbols');

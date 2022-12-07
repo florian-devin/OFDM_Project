@@ -21,15 +21,15 @@ clc;
 
 % Configuration Values
 conf.audiosystem = 'bypass'; % Values: 'matlab','native','bypass'
-conf.estimationtype = 'none'; % For chanel estimation and correction : 'none', 'block'
-conf.plotfig = 'yes';
+conf.estimationtype = 'block'; % For chanel estimation and correction : 'none', 'block'
+conf.plotfig = 0;
 
 % OFDM 
 conf.nbcarriers = 256;
 conf.carriersSpacing = 5; % Hz
 conf.cp_length = conf.nbcarriers / 2;
 conf.bandwidth = ceil((conf.nbcarriers + 1)/ 2)*conf.carriersSpacing;
-conf.nbdatapertrainning = 1;
+conf.nbdatapertrainning = 10;
 
 conf.f_s     = 48000;   % sampling rate  
 conf.f_sym   = 100;     % symbol rate
@@ -38,12 +38,11 @@ conf.rolloff = 0.22;
 conf.filterlength = 20;
 
 conf.nframes = 1;       % number of frames to transmit
-conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2;    % number of bits 
+conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      *  4;    % number of bits thes last 2 is for 2 training block insertion
 conf.modulation_order = 2; % BPSK:1, QPSK:2
 conf.f_c     = 4000;
 
 conf.npreamble  = 256;
-conf.ntraining  = conf.nbcarriers;
 conf.bitsps     = 16;   % bits per audio sample
 conf.offset     = 0;
 
@@ -58,8 +57,10 @@ conf.os_factor_preambul = 4;
 conf.preamble =  -2*(preamble_generate(conf.npreamble)) + 1; % BPSK (-1 or 1)
 % Training generation
 %preamble_generate generate a random sequence perfect for trainingseq
-conf.trainingseq = -2*(preamble_generate(conf.ntraining)) + 1; % BPSK (-1 or 1)
-
+conf.trainingseq = -2*(preamble_generate(conf.nbcarriers)) + 1; % BPSK (-1 or 1)
+% TODO : This line is only for debug remove it
+conf.trainingseq = zeros(conf.nbcarriers,1);
+conf.nbtraining = conf.nbits/ (conf.nbcarriers * conf.modulation_order * conf.nbdatapertrainning) ; % Dont touch this variable
 
 if mod(conf.os_factor_preambul,1) ~= 0
    disp('WARNING: Sampling rate must be a multiple of the symbol rate'); 
@@ -148,7 +149,7 @@ for k=1:conf.nframes
     end
     
     % Plot received signal for debugging
-    if (conf.plotfig == 'yes')
+    if (conf.plotfig == 1)
         figure;
         plot(rxsignal);
         title('Received Signal')

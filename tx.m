@@ -17,14 +17,17 @@ function [txsignal conf] = tx(txbits,conf,k)
 % Map data to QPSK symbols
 tx_symbols = mapper(txbits,conf);
 
-disp('Tx first QPSK symbol')
-tx_symbols(1)
-
 %%% OFDM Part
-tx_symbols =  reshape(tx_symbols,[conf.nbcarriers conf.nbdatapertrainning]);
-
-% Training symbols insertion
-tx_symbols =  [conf.trainingseq, tx_symbols];
+% Add training blocks
+tx_symbols =  reshape(tx_symbols,[conf.nbcarriers conf.nbdatapertrainning*conf.nbtraining]);
+for block = 0:conf.nbtraining-1
+    if block == 0
+        tx_symbols =  [conf.trainingseq, tx_symbols];
+    else
+        tx_symbols = [tx_symbols(:,1:block*conf.nbdatapertrainning+block-1) conf.trainingseq tx_symbols(:,block*conf.nbdatapertrainning+block:end)];
+    end
+end
+%tx_symbols =  [conf.trainingseq, tx_symbols];
 
 % Map into OFDM and add CP
 ofdm_symbol = zeros((conf.nbcarriers + conf.cp_length)*conf.os_factor_ofdm,size(tx_symbols,2));
@@ -50,7 +53,7 @@ txsignal = modulate(txsignal, conf);
 
 
 % plots
-if (conf.plotfig == 'yes')
+if (conf.plotfig == 1)
     figure;
     f = - conf.f_s/2 : conf.f_s/length(txsignal) : conf.f_s/2 - conf.f_s/length(txsignal);
     plot(f,abs(fftshift(fft(txsignal))))

@@ -17,12 +17,15 @@ function [txsignal conf] = tx(txbits,conf,k)
 % Map data to QPSK symbols
 tx_symbols = mapper(txbits,conf);
 
-disp('Tx first QPSK symbol')
-tx_symbols(1)
-
 %%% OFDM Part
-tx_symbols =  reshape(tx_symbols,[conf.nbcarriers conf.nbdatapertrainning]);
-
+% Add training blocks
+%nb_training is the number of training block needed for this amont of bits
+%(the amont of bits needs to be a factor of the bit transmited per complet block) 
+nb_training = conf.nbcarriers * conf.modulation_order * conf.nbdatapertrainning / conf.nbits;
+tx_symbols =  reshape(tx_symbols,[conf.nbcarriers conf.nbdatapertrainning*nb_training]);
+for block = 1:nb_training
+    tx_symbols() = [tx_symbols(:,1:) conf.trainingseq, tx_symbols];
+end
 % Training symbols insertion
 tx_symbols =  [conf.trainingseq, tx_symbols];
 
@@ -58,11 +61,6 @@ if (conf.plotfig == 'yes')
     title('Spectre of transmitted signal');
     xlabel('frequency/Hz');
     ylabel('Amplitude');
-
-    figure;
-    plot(real(tx_non_modulated(1:conf.npreamble*conf.os_factor_preambul)),imag(tx_non_modulated(1:conf.npreamble*conf.os_factor_preambul)),'yo',...
-        real(tx_non_modulated(conf.npreamble*conf.os_factor_preambul:conf.nbcarriers*conf.os_factor_preambul)),imag(tx_non_modulated(conf.npreamble*conf.os_factor_preambul:conf.nbcarriers*conf.os_factor_preambul)),'bo');
-    title('Tx constelation');
 end
 
 
