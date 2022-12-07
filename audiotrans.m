@@ -9,37 +9,58 @@
 %       - ALSA audio tools, most Linux distrubtions
 %       - builtin WAV tools on Windows 
 %   - 'bypass' : no audio transmission, takes txsignal as received signal
+
+%TODO : make it work for multiple training sequence
+%TODO : add better estimation of the chanel
+%TODO : add random bits to complete all cariers
+
+
 clear variables;
 close all;
 clc;
+
 % Configuration Values
 conf.audiosystem = 'bypass'; % Values: 'matlab','native','bypass'
+conf.estimationtype = 'none'; % For chanel estimation and correction : 'none', 'block'
+conf.plotfig = 'yes';
 
 % OFDM 
 conf.nbcarriers = 256;
 conf.carriersSpacing = 5; % Hz
 conf.cp_length = conf.nbcarriers / 2;
 conf.bandwidth = ceil((conf.nbcarriers + 1)/ 2)*conf.carriersSpacing;
-conf.nbdatapertrainning = 4;
+conf.nbdatapertrainning = 1;
 
 conf.f_s     = 48000;   % sampling rate  
 conf.f_sym   = 100;     % symbol rate
+% for rx filter (preamble filter)
 conf.rolloff = 0.22;
 conf.filterlength = 20;
+
 conf.nframes = 1;       % number of frames to transmit
 conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2;    % number of bits 
 conf.modulation_order = 2; % BPSK:1, QPSK:2
 conf.f_c     = 4000;
 
 conf.npreamble  = 256;
+conf.ntraining  = conf.nbcarriers;
 conf.bitsps     = 16;   % bits per audio sample
 conf.offset     = 0;
 
 
+
 % Init Section
 % all calculations that you only have to do once
-conf.os_factor_ofdm  = conf.f_s/conf.carriersSpacing/conf.nbcarriers;
-conf.os_factor_preambul = conf.f_s/conf.f_sym;
+conf.os_factor_ofdm  = conf.f_s/(conf.carriersSpacing*conf.nbcarriers); % given by >> help osifft
+%conf.os_factor_preambul = conf.f_s/conf.f_sym; % os_factor for BPSK preambule (single carrier)
+conf.os_factor_preambul = 4;
+% Preamble generation
+conf.preamble =  -2*(preamble_generate(conf.npreamble)) + 1; % BPSK (-1 or 1)
+% Training generation
+%preamble_generate generate a random sequence perfect for trainingseq
+conf.trainingseq = -2*(preamble_generate(conf.ntraining)) + 1; % BPSK (-1 or 1)
+
+
 if mod(conf.os_factor_preambul,1) ~= 0
    disp('WARNING: Sampling rate must be a multiple of the symbol rate'); 
 end
@@ -72,6 +93,7 @@ for k=1:conf.nframes
     % normalize values
     peakvalue       = max(abs(txsignal));
     normtxsignal    = txsignal / (peakvalue + 0.3);
+
     
     % create vector for transmission
     rawtxsignal = [ zeros(conf.f_s,1) ; normtxsignal ;  zeros(conf.f_s,1) ]; % add padding before and after the signal
@@ -126,10 +148,11 @@ for k=1:conf.nframes
     end
     
     % Plot received signal for debugging
-    figure;
-    plot(rxsignal);
-    title('Received Signal')
-    
+    if (conf.plotfig == 'yes')
+        figure;
+        plot(rxsignal);
+        title('Received Signal')
+    end
     %
     % End
     % Audio Transmission   
