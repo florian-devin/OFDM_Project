@@ -22,7 +22,7 @@ clc;
 % Configuration Values
 conf.audiosystem = 'bypass'; % Values: 'matlab','native','bypass'
 conf.estimationtype = 'block'; % For chanel estimation and correction : 'none', 'block'
-conf.plotfig = 0;
+conf.plotfig = 1;
 
 % OFDM 
 conf.nbcarriers = 256;
@@ -38,7 +38,7 @@ conf.rolloff = 0.22;
 conf.filterlength = 20;
 
 conf.nframes = 1;       % number of frames to transmit
-conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      *  4;    % number of bits thes last 2 is for 2 training block insertion
+conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      * 1;    % number of bits thes last 2 is for 2 training block insertion
 conf.modulation_order = 2; % BPSK:1, QPSK:2
 conf.f_c     = 4000;
 
@@ -58,8 +58,8 @@ conf.preamble =  -2*(preamble_generate(conf.npreamble)) + 1; % BPSK (-1 or 1)
 % Training generation
 %preamble_generate generate a random sequence perfect for trainingseq
 conf.trainingseq = -2*(preamble_generate(conf.nbcarriers)) + 1; % BPSK (-1 or 1)
-% TODO : This line is only for debug remove it
-conf.trainingseq = zeros(conf.nbcarriers,1);
+
+
 conf.nbtraining = conf.nbits/ (conf.nbcarriers * conf.modulation_order * conf.nbdatapertrainning) ; % Dont touch this variable
 
 if mod(conf.os_factor_preambul,1) ~= 0

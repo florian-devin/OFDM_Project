@@ -48,7 +48,7 @@ end
 
 if (conf.plotfig == 1)
     figure;
-    plot(L * frame_sync_length + 1 : length(rx_signal),c(:,index));
+    plot(0: c( L * frame_sync_length + 1 : length(rx_signal),index));
     title('sync');
 end
 

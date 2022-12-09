@@ -24,7 +24,7 @@ for block = 0:conf.nbtraining-1
     if block == 0
         tx_symbols =  [conf.trainingseq, tx_symbols];
     else
-        tx_symbols = [tx_symbols(:,1:block*conf.nbdatapertrainning+block-1) conf.trainingseq tx_symbols(:,block*conf.nbdatapertrainning+block:end)];
+        tx_symbols = [tx_symbols(:,1:block*conf.nbdatapertrainning+block) conf.trainingseq tx_symbols(:,block*conf.nbdatapertrainning+block+1:end)];
     end
 end
 %tx_symbols =  [conf.trainingseq, tx_symbols];

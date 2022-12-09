@@ -10,4 +10,6 @@ b = b.';
 b = b(:);
 
 b = double(b); % Convert data type from logical to double
+
+
 end

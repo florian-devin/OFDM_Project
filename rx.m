@@ -23,8 +23,9 @@ f_corner = 1.05*conf.bandwidth; % The size of the filter is a little bit biger t
 rxsignal_filtered = 2 * ofdmlowpass(rxsignal, conf, f_corner);
 
 % Frame syncronisation
-%TODO remplace by this line : start_idx = frame_sync(rxsignal_filtered, conf);
-start_idx = conf.f_s+1 + conf.npreamble;
+%TODO remplace by this line : 
+start_idx = frame_sync(rxsignal_filtered, conf);
+%start_idx = 49065;
 %rx_size = (conf.nbdatapertrainning+1) * conf.os_factor_ofdm * conf.nbcarriers * (conf.cp_length / conf.nbcarriers + 1);
 rx_size = (conf.nbcarriers*conf.os_factor_ofdm*conf.nbtraining*(conf.nbdatapertrainning+1)*(1+conf.cp_length/conf.nbcarriers));
 rxsignal_filtered = rxsignal_filtered(start_idx:start_idx+rx_size-1);
@@ -42,8 +43,8 @@ end
 
 if (conf.plotfig == 1)
     figure;
-    plot(real(rxsymbol(:,1)),imag(rxsymbol(:,1)), 'o');
-    title('Received training Symbols (BPSK)');
+    plot(real(rxsymbol),imag(rxsymbol), 'o');
+    title('Received Symbols before correction');
 end
 
 % Channel estimation
@@ -71,10 +72,12 @@ end
 
 rxdata = rxdata(:);
 
+rxdata = rxdata / sqrt(mean(abs(rxdata).^2));
+
 if (conf.plotfig == 1)
     figure;
     plot(real(rxdata),imag(rxdata), 'o');
-    title('Received Symbols');
+    title('Received Symbols after correction');
 end
 
 rxbits = demapper(rxdata);
