@@ -15,6 +15,11 @@ c_norm = zeros(Nr-Np, 1);
             return
         end
     end
+
+figure;
+plot(1:Nr-Np, c_norm);
+title("detector result");
+   
 disp('Frame start not found.')
 start = -1;
 end

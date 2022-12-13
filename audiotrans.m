@@ -18,11 +18,15 @@
 clear variables;
 close all;
 clc;
+plotdata.plotfig = 1;
+plotdata.figrx = [];
+plotdata.figtx = [];
 
 % Configuration Values
-conf.audiosystem = 'bypass'; % Values: 'matlab','native','bypass'
-conf.estimationtype = 'block'; % For chanel estimation and correction : 'none', 'block'
+conf.audiosystem = 'bypass'; % Values: 'matlab','native','bypass','bypass2'
+conf.estimationtype = 'viterbi'; % For chanel estimation and correction : 'none', 'block', 'viterbi'
 conf.plotfig = 1;
+
 
 % OFDM 
 conf.nbcarriers = 256;
@@ -38,9 +42,9 @@ conf.rolloff = 0.22;
 conf.filterlength = 20;
 
 conf.nframes = 1;       % number of frames to transmit
-conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      * 1;    % number of bits thes last 2 is for 2 training block insertion
+conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      * 3;    % number of bits thes last 2 is for 2 training block insertion
 conf.modulation_order = 2; % BPSK:1, QPSK:2
-conf.f_c     = 4000;
+conf.f_c     = 10000;
 
 conf.npreamble  = 256;
 conf.bitsps     = 16;   % bits per audio sample
@@ -57,8 +61,8 @@ conf.os_factor_preambul = 4;
 conf.preamble =  -2*(preamble_generate(conf.npreamble)) + 1; % BPSK (-1 or 1)
 % Training generation
 %preamble_generate generate a random sequence perfect for trainingseq
-conf.trainingseq = -2*(preamble_generate(conf.nbcarriers)) + 1; % BPSK (-1 or 1)
-
+%conf.trainingseq = -2*(preamble_generate(conf.nbcarriers)) + 1; % BPSK (-1 or 1)
+conf.trainingseq = -2*(randi([0 1],conf.nbcarriers,1)) + 1;
 
 conf.nbtraining = conf.nbits/ (conf.nbcarriers * conf.modulation_order * conf.nbdatapertrainning) ; % Dont touch this variable
 
@@ -84,7 +88,7 @@ for k=1:conf.nframes
     txbits = randi([0 1],conf.nbits,1);
     
     % TODO: Implement tx() Transmit Function
-    [txsignal conf] = tx(txbits,conf,k);
+    [txsignal conf plotdata] = tx(txbits,conf,k,plotdata);
 
     % % % % % % % % % % % %
     % Begin
@@ -146,6 +150,19 @@ for k=1:conf.nframes
     elseif strcmp(conf.audiosystem,'bypass')
         rawrxsignal = rawtxsignal(:,1);
         rxsignal    = rawrxsignal;
+    elseif strcmp(conf.audiosystem, 'bypass2')
+        SNR = 1;
+        SNRlin = 10^(SNR/10);
+        rawrxsignal = rawtxsignal(:,1);
+        %rawrxsignal = rawrxsignal + sqrt(1/(2*SNRlin)) * (randn(size(rawrxsignal)) + 1i*randn(size(rawrxsignal))); 
+        sigmaDeltaTheta = 0.004;
+        theta_n = generate_phase_noise(length(rawrxsignal), sigmaDeltaTheta);
+        %apply phase noize
+        rawrxsymbol =  demodulate(rawrxsignal, conf);
+        rawrxsymbol = rawrxsymbol.*exp(1j*theta_n);
+        rawrxsymbol = rawrxsymbol + sqrt(1/(2*SNRlin)) * (randn(size(rawrxsymbol)) + 1i*randn(size(rawrxsymbol))); 
+        rawrxsignal =  modulate(rawrxsymbol, conf);
+        rxsignal    = rawrxsignal;
     end
     
     % Plot received signal for debugging
@@ -159,12 +176,49 @@ for k=1:conf.nframes
     % Audio Transmission   
     % % % % % % % % % % % %
     
-    % TODO: Implement rx() Receive Function
     [rxbits conf]       = rx(rxsignal,conf);
     
     res.rxnbits(k)      = length(rxbits);
     res.biterrors(k)    = sum(rxbits ~= txbits);
-    
+
+    %%% Plot section
+    figure(4);
+    subplot(231);
+    grid on;
+    plot(plotdata.figtx.spt.x,plotdata.figtx.spt.y);
+    title(plotdata.figtx.spt.title);
+    xlabel(plotdata.figtx.spt.xlabel);
+    ylabel(plotdata.figtx.spt.ylabel);
+
+    subplot(232);
+    hold on;
+    plot(plotdata.figtx.symb.xpreamble,plotdata.figtx.symb.ypreamble,'yo');
+    plot(plotdata.figtx.symb.xtraining,plotdata.figtx.symb.ytraining,'g+');
+    plot(plotdata.figtx.symb.xdata    ,plotdata.figtx.symb.ydata    ,'bo');
+    title(plotdata.figtx.symb.title);
+    xlabel(plotdata.figtx.symb.xlabel);
+    ylabel(plotdata.figtx.symb.ylabel);
+
+    subplot(233);
+    plot(rawtxsignal);
+    title('Transmited signal');
+    xlabel('Sample');
+    ylabel('Amplitude');
+
+    subplot(234);
+    plot(rxsignal);
+    title('Received signal');
+    xlabel('Sample');
+    ylabel('Amplitude');
+
+    subplot(235);
+%     grid on;
+%     plot(plotdata.figrx.spt.x,plotdata.figrx.spt.y);
+%     title(plotdata.figrx.spt.title);
+%     xlabel(plotdata.figrx.spt.xlabel);
+%     ylabel(plotdata.figrx.spt.ylabel);
+
+
 end
 
 per = sum(res.biterrors > 0)/conf.nframes

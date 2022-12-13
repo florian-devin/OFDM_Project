@@ -24,33 +24,26 @@ frame_sync_sequence = conf.preamble;
 current_peak_value = 0;
 L = conf.os_factor_preambul;
 samples_after_threshold = L;
-index = 1;
 for i = L * frame_sync_length + 1 : length(rx_signal)
-    r(:,index) = rx_signal(i - L * frame_sync_length : L : i - L); % The part of the received signal that is currently inside the correlator.
-    c(:,index) = frame_sync_sequence' * r(:,index);
-    T(:,index) = abs(c(:,index))^2 / abs(r(:,index)' * r(:,index));
+    r = rx_signal(i - L * frame_sync_length : L : i - L); % The part of the received signal that is currently inside the correlator.
+    c = frame_sync_sequence' * r;
+    T = abs(c)^2 / abs(r' * r);
     
-    if (T(:,index) > detection_threshold || samples_after_threshold < L)
+    if (T > detection_threshold || samples_after_threshold < L)
         samples_after_threshold = samples_after_threshold - 1;
-        if (T(:,index) > current_peak_value)
+        if (T > current_peak_value)
             beginning_of_data = i;
             % TODO
             
-            phase_of_peak = angle(c(:,index));
-            current_peak_value = T(:,index);
+            phase_of_peak = angle(c);
+            current_peak_value = T;
         end
         if (samples_after_threshold == 0)
             return;
         end
     end
-    index = index +1;
 end
 
-if (conf.plotfig == 1)
-    figure;
-    plot(L * frame_sync_length + 1 : length(rx_signal),c(:,index));
-    title('sync');
-end
 
 error('No synchronization sequence found.');
 return
