@@ -18,20 +18,17 @@
 clear variables;
 close all;
 clc;
-plotdata.plotfig = 1;
-plotdata.figrx = [];
-plotdata.figtx = [];
 
 % Configuration Values
-conf.audiosystem = 'bypass'; % Values: 'matlab','native','bypass','bypass2'
+conf.audiosystem = 'matlab'; % Values: 'matlab','native','bypass','bypass2'
 conf.estimationtype = 'viterbi'; % For chanel estimation and correction : 'none', 'block', 'viterbi'
 conf.plotfig = 1;
 
 
 % OFDM 
-conf.nbcarriers = 256;
-conf.carriersSpacing = 5; % Hz
-conf.cp_length = conf.nbcarriers / 2;
+conf.nbcarriers = 4096;
+conf.carriersSpacing = 1; % Hz
+conf.cp_length = conf.nbcarriers / 16;
 conf.bandwidth = ceil((conf.nbcarriers + 1)/ 2)*conf.carriersSpacing;
 conf.nbdatapertrainning = 10;
 
@@ -42,7 +39,7 @@ conf.rolloff = 0.22;
 conf.filterlength = 20;
 
 conf.nframes = 1;       % number of frames to transmit
-conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      * 3;    % number of bits thes last 2 is for 2 training block insertion
+conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      * 10;    % number of bits
 conf.modulation_order = 2; % BPSK:1, QPSK:2
 conf.f_c     = 10000;
 
@@ -64,12 +61,12 @@ conf.preamble =  -2*(preamble_generate(conf.npreamble)) + 1; % BPSK (-1 or 1)
 %conf.trainingseq = -2*(preamble_generate(conf.nbcarriers)) + 1; % BPSK (-1 or 1)
 conf.trainingseq = -2*(randi([0 1],conf.nbcarriers,1)) + 1;
 
-conf.nbtraining = conf.nbits/ (conf.nbcarriers * conf.modulation_order * conf.nbdatapertrainning) ; % Dont touch this variable
+
 
 if mod(conf.os_factor_preambul,1) ~= 0
    disp('WARNING: Sampling rate must be a multiple of the symbol rate'); 
 end
-conf.nsyms      = ceil(conf.nbits/conf.modulation_order);
+
 
 % Initialize result structure with zero
 res.biterrors   = zeros(conf.nframes,1);
@@ -84,11 +81,22 @@ res.rxnbits     = zeros(conf.nframes,1);
 
 for k=1:conf.nframes
     
-    % Generate random data
-    txbits = randi([0 1],conf.nbits,1);
+    % Generate random data (not use)
+    %txbits = randi([0 1],conf.nbits,1);
+
+    % Load image
+    load("Matterhorn.mat");
+    txbits = Matterhorn_bin;
+
+    % Add random bits at the end
+    [txbits conf] = add_random_bit(txbits,conf);
+    conf.nbtraining = conf.nbits/ (conf.nbcarriers * conf.modulation_order * conf.nbdatapertrainning) ; % Dont touch this variable
+    conf.nsyms      = ceil(conf.nbits/conf.modulation_order);
     
-    % TODO: Implement tx() Transmit Function
-    [txsignal conf plotdata] = tx(txbits,conf,k,plotdata);
+
+    % Transmit Function
+    [txsignal conf] = tx(txbits,conf,k);
+
 
     % % % % % % % % % % % %
     % Begin
@@ -105,6 +113,14 @@ for k=1:conf.nframes
     rawtxsignal = [  rawtxsignal  zeros(size(rawtxsignal)) ]; % add second channel: no signal
     txdur       = length(rawtxsignal)/conf.f_s; % calculate length of transmitted signal
     
+if (conf.plotfig == 1)
+    figure(4);
+    subplot(244);
+    plot(rawtxsignal(:,1));
+    title('Transmited signal');
+    xlabel('Sample');
+    ylabel('Amplitude');
+end   
 %     wavwrite(rawtxsignal,conf.f_s,16,'out.wav')   
     audiowrite('out.wav',rawtxsignal,conf.f_s)  
     
@@ -151,11 +167,10 @@ for k=1:conf.nframes
         rawrxsignal = rawtxsignal(:,1);
         rxsignal    = rawrxsignal;
     elseif strcmp(conf.audiosystem, 'bypass2')
-        SNR = 1;
+        SNR = 100;
         SNRlin = 10^(SNR/10);
         rawrxsignal = rawtxsignal(:,1);
-        %rawrxsignal = rawrxsignal + sqrt(1/(2*SNRlin)) * (randn(size(rawrxsignal)) + 1i*randn(size(rawrxsignal))); 
-        sigmaDeltaTheta = 0.004;
+        sigmaDeltaTheta = 0.0007;
         theta_n = generate_phase_noise(length(rawrxsignal), sigmaDeltaTheta);
         %apply phase noize
         rawrxsymbol =  demodulate(rawrxsignal, conf);
@@ -167,10 +182,13 @@ for k=1:conf.nframes
     
     % Plot received signal for debugging
     if (conf.plotfig == 1)
-        figure;
+        figure(4);
+        subplot(248);
         plot(rxsignal);
-        title('Received Signal')
-    end
+        title('Received Signal');
+        xlabel('Sample');
+        ylabel('Amplitude');
+    end   
     %
     % End
     % Audio Transmission   
@@ -181,42 +199,18 @@ for k=1:conf.nframes
     res.rxnbits(k)      = length(rxbits);
     res.biterrors(k)    = sum(rxbits ~= txbits);
 
-    %%% Plot section
-    figure(4);
-    subplot(231);
-    grid on;
-    plot(plotdata.figtx.spt.x,plotdata.figtx.spt.y);
-    title(plotdata.figtx.spt.title);
-    xlabel(plotdata.figtx.spt.xlabel);
-    ylabel(plotdata.figtx.spt.ylabel);
+    % decode image
+    % remove random bits
+    nb_random_rx_bits = bi2de(rxbits(1:32)','left-msb');
+    %nb_random_rx_bits = 2016;
+    payload_data = rxbits(33:end - nb_random_rx_bits);
+    image_size = [128 128];
+    figure(5);
+    image = image_decoder(payload_data, image_size);
+    imshow(image/255);
+    title("Recovered Image")
 
-    subplot(232);
-    hold on;
-    plot(plotdata.figtx.symb.xpreamble,plotdata.figtx.symb.ypreamble,'yo');
-    plot(plotdata.figtx.symb.xtraining,plotdata.figtx.symb.ytraining,'g+');
-    plot(plotdata.figtx.symb.xdata    ,plotdata.figtx.symb.ydata    ,'bo');
-    title(plotdata.figtx.symb.title);
-    xlabel(plotdata.figtx.symb.xlabel);
-    ylabel(plotdata.figtx.symb.ylabel);
 
-    subplot(233);
-    plot(rawtxsignal);
-    title('Transmited signal');
-    xlabel('Sample');
-    ylabel('Amplitude');
-
-    subplot(234);
-    plot(rxsignal);
-    title('Received signal');
-    xlabel('Sample');
-    ylabel('Amplitude');
-
-    subplot(235);
-%     grid on;
-%     plot(plotdata.figrx.spt.x,plotdata.figrx.spt.y);
-%     title(plotdata.figrx.spt.title);
-%     xlabel(plotdata.figrx.spt.xlabel);
-%     ylabel(plotdata.figrx.spt.ylabel);
 
 
 end

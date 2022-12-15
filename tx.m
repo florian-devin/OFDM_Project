@@ -1,4 +1,4 @@
-function [txsignal conf plotdata] = tx(txbits,conf,k,plotdata)
+function [txsignal conf] = tx(txbits,conf,k)
 % Digital Transmitter
 %
 %   [txsignal conf] = tx(txbits,conf,k) implements a complete transmitter
@@ -17,16 +17,17 @@ function [txsignal conf plotdata] = tx(txbits,conf,k,plotdata)
 % Map data to QPSK symbols
 tx_symbols = mapper(txbits,conf);
 
-% plots tx mapped symbols
-plotdata.figtx.symb.xpreamble     = real(conf.preamble);
-plotdata.figtx.symb.ypreamble     = imag(conf.preamble);
-plotdata.figtx.symb.xtraining     = real(conf.trainingseq);
-plotdata.figtx.symb.ytraining     = imag(conf.trainingseq);
-plotdata.figtx.symb.xdata         = real(tx_symbols);
-plotdata.figtx.symb.ydata         = imag(tx_symbols);
-plotdata.figtx.symb.title = 'Transmited constelation';
-plotdata.figtx.symb.xlabel= 'Re';
-plotdata.figtx.symb.ylabel= 'Im';
+if (conf.plotfig == 1)
+    figure(4);
+    subplot(221);
+    plot(real(conf.preamble),imag(conf.preamble),'yo');
+    plot(real(conf.trainingseq),imag(conf.trainingseq),'g+');
+    plot(real(tx_symbols),imag(tx_symbols),'bo');
+    title('Transmited constelation');
+    xlabel('Re');
+    ylabel('Im');
+end   
+
 
 
 %%% OFDM Part
@@ -63,11 +64,17 @@ tx_non_modulated = txsignal;
 txsignal = modulate(txsignal, conf);
 
 % plots tx spectre
-plotdata.figtx.spt.x     = - conf.f_s/2 : conf.f_s/length(txsignal) : conf.f_s/2 - conf.f_s/length(txsignal);
-plotdata.figtx.spt.y     = abs(fftshift(fft(txsignal)));
-plotdata.figtx.spt.title = 'Spectre of transmitted signal';
-plotdata.figtx.spt.xlabel= 'frequency/Hz';
-plotdata.figtx.spt.ylabel= 'Amplitude';
+
+if (conf.plotfig == 1)
+    figure(4);
+    subplot(243);
+    f = - conf.f_s/2 : conf.f_s/length(txsignal) : conf.f_s/2 - conf.f_s/length(txsignal);
+    plot(f,abs(fftshift(fft(txsignal))));
+    title('Spectre of transmitted signal');
+    xlabel('frequency/Hz');
+    ylabel('Amplitude');
+end   
+
 
 
 

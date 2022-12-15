@@ -15,11 +15,15 @@ function [rxbits conf] = rx(rxsignal,conf,k)
 %
 
 % plots rx spectre
-% plotdata.figrx.spt.x     = - conf.f_s/2 : conf.f_s/length(rxsignal) : conf.f_s/2 - conf.f_s/length(rxsignal);
-% plotdata.figrx.spt.y     = abs(fftshift(fft(rxsignal)));
-% plotdata.figrx.spt.title = 'Spectre of received signal';
-% plotdata.figrx.spt.xlabel= 'frequency/Hz';
-% plotdata.figrx.spt.ylabel= 'Amplitude';
+if (conf.plotfig == 1)
+    figure(4);
+    subplot(247);
+    f = - conf.f_s/2 : conf.f_s/length(rxsignal) : conf.f_s/2 - conf.f_s/length(rxsignal);
+    plot(f,abs(fftshift(fft(rxsignal))));
+    title('Spectre of received signal');
+    xlabel('frequency/Hz');
+    ylabel('Amplitude');
+end   
 
 
 %Demodulate
@@ -55,7 +59,8 @@ if (conf.plotfig == 1)
             block_idx = block*conf.nbdatapertrainning+1;
             rxsymbolplot(:,block_idx) = []; %remove training seq
     end
-    figure;
+    figure(4);
+    subplot(246);
     plot(real(rxsymbolplot),imag(rxsymbolplot), 'o');
     title('Received Symbols before correction');
 end
@@ -115,7 +120,8 @@ rxdata = rxdata(:);
 rxdata = rxdata / sqrt(mean(abs(rxdata).^2));
 
 if (conf.plotfig == 1)
-    figure;
+    figure(4);
+    subplot(245);
     plot(real(rxdata),imag(rxdata), 'o');
     title('Received Symbols after correction');
 end
