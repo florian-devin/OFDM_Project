@@ -45,5 +45,7 @@ for i = L * frame_sync_length + 1 : length(rx_signal)
 end
 
 
-error('No synchronization sequence found.');
+warning('No synchronization sequence found.');
+beginning_of_data = 1;
+phase_of_peak = 0;
 return
