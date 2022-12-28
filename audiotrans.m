@@ -3,12 +3,13 @@
 % Audio Transmission Framework 
 %
 %
-%   3 operating modes:
-%   - 'matlab' : generic MATLAB audio routines (unreliable under Linux)
-%   - 'native' : OS native audio system
+%   4 operating modes:
+%   - 'matlab'  : generic MATLAB audio routines (unreliable under Linux)
+%   - 'native'  : OS native audio system
 %       - ALSA audio tools, most Linux distrubtions
 %       - builtin WAV tools on Windows 
-%   - 'bypass' : no audio transmission, takes txsignal as received signal
+%   - 'bypass'  : no audio transmission, takes txsignal as received signal
+%   - 'bypass2' : white noize and phase shift is added to the signal by matlab
 
 %TODO : make it work for multiple training sequence
 %TODO : add better estimation of the chanel
@@ -20,17 +21,18 @@ close all;
 clc;
 
 % Configuration Values
-conf.audiosystem = 'matlab'; % Values: 'matlab','native','bypass','bypass2'
+conf.audiosystem = 'bypass2'; % Values: 'matlab','native','bypass','bypass2'
 conf.estimationtype = 'viterbi'; % For chanel estimation and correction : 'none', 'block', 'viterbi'
+conf.datatype = 'image'; %type of transmited data : 'image' 'random'
 conf.plotfig = 1;
 
 
 % OFDM 
-conf.nbcarriers = 4096;
-conf.carriersSpacing = 1; % Hz
-conf.cp_length = conf.nbcarriers / 16;
+conf.nbcarriers = 512;
+conf.carriersSpacing = 2; % Hz
+conf.cp_length = 128;
 conf.bandwidth = ceil((conf.nbcarriers + 1)/ 2)*conf.carriersSpacing;
-conf.nbdatapertrainning = 10;
+conf.nbdatapertrainning = 64;
 
 conf.f_s     = 48000;   % sampling rate  
 conf.f_sym   = 100;     % symbol rate
@@ -39,9 +41,9 @@ conf.rolloff = 0.22;
 conf.filterlength = 20;
 
 conf.nframes = 1;       % number of frames to transmit
-conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      * 10;    % number of bits
+conf.nbits   = conf.nbdatapertrainning*conf.nbcarriers*2      * 5;    % number of bits
 conf.modulation_order = 2; % BPSK:1, QPSK:2
-conf.f_c     = 10000;
+conf.f_c     = 6000;
 
 conf.npreamble  = 256;
 conf.bitsps     = 16;   % bits per audio sample
@@ -50,16 +52,12 @@ conf.offset     = 0;
 
 
 % Init Section
-% all calculations that you only have to do once
 conf.os_factor_ofdm  = conf.f_s/(conf.carriersSpacing*conf.nbcarriers); % given by >> help osifft
-%conf.os_factor_preambul = conf.f_s/conf.f_sym; % os_factor for BPSK preambule (single carrier)
 conf.os_factor_preambul = 4;
 % Preamble generation
 conf.preamble =  -2*(preamble_generate(conf.npreamble)) + 1; % BPSK (-1 or 1)
 % Training generation
-%preamble_generate generate a random sequence perfect for trainingseq
-%conf.trainingseq = -2*(preamble_generate(conf.nbcarriers)) + 1; % BPSK (-1 or 1)
-conf.trainingseq = -2*(randi([0 1],conf.nbcarriers,1)) + 1;
+conf.trainingseq = -2*(randi([0 1],conf.nbcarriers,1)) + 1; % BPSK (-1 or 1)
 
 
 
@@ -72,24 +70,22 @@ end
 res.biterrors   = zeros(conf.nframes,1);
 res.rxnbits     = zeros(conf.nframes,1);
 
-% TODO: To speed up your simulation pregenerate data you can reuse
-% beforehand.
-
-
-% Results
 
 
 for k=1:conf.nframes
-    
-    % Generate random data (not use)
-    %txbits = randi([0 1],conf.nbits,1);
 
-    % Load image
-    load("Matterhorn.mat");
-    txbits = Matterhorn_bin;
+    if strcmp(conf.datatype,'random')
+        % Generate random data
+        txbits = randi([0 1],conf.nbits,1);
+    elseif strcmp(conf.datatype,'image')
+        % Load image
+        load("Matterhorn.mat");
+        txbits = Matterhorn_bin;
 
-    % Add random bits at the end
-    [txbits conf] = add_random_bit(txbits,conf);
+        % Add random bits at the end
+        [txbits conf] = add_random_bit(txbits,conf);
+        nb_rdm_bits = txbits(1:32);
+    end
     conf.nbtraining = conf.nbits/ (conf.nbcarriers * conf.modulation_order * conf.nbdatapertrainning) ; % Dont touch this variable
     conf.nsyms      = ceil(conf.nbits/conf.modulation_order);
     
@@ -121,7 +117,7 @@ if (conf.plotfig == 1)
     xlabel('Sample');
     ylabel('Amplitude');
 end   
-%     wavwrite(rawtxsignal,conf.f_s,16,'out.wav')   
+    %wavwrite(rawtxsignal,conf.f_s,16,'out.wav')   
     audiowrite('out.wav',rawtxsignal,conf.f_s)  
     
     % Platform native audio mode 
@@ -167,12 +163,12 @@ end
         rawrxsignal = rawtxsignal(:,1);
         rxsignal    = rawrxsignal;
     elseif strcmp(conf.audiosystem, 'bypass2')
-        SNR = 100;
+        SNR = 30;
         SNRlin = 10^(SNR/10);
         rawrxsignal = rawtxsignal(:,1);
-        sigmaDeltaTheta = 0.0007;
+        sigmaDeltaTheta = 0.0005;
         theta_n = generate_phase_noise(length(rawrxsignal), sigmaDeltaTheta);
-        %apply phase noize
+        %apply phase-shift and white noize
         rawrxsymbol =  demodulate(rawrxsignal, conf);
         rawrxsymbol = rawrxsymbol.*exp(1j*theta_n);
         rawrxsymbol = rawrxsymbol + sqrt(1/(2*SNRlin)) * (randn(size(rawrxsymbol)) + 1i*randn(size(rawrxsymbol))); 
@@ -199,16 +195,20 @@ end
     res.rxnbits(k)      = length(rxbits);
     res.biterrors(k)    = sum(rxbits ~= txbits);
 
-    % decode image
-    % remove random bits
-    nb_random_rx_bits = bi2de(rxbits(1:32)','left-msb');
-    %nb_random_rx_bits = 2016;
-    payload_data = rxbits(33:end - nb_random_rx_bits);
-    image_size = [128 128];
-    figure(5);
-    image = image_decoder(payload_data, image_size);
-    imshow(image/255);
-    title("Recovered Image")
+    if strcmp(conf.datatype,'image')
+        % decode image
+        % remove random bits
+        %nb_random_rx_bits = bi2de(rxbits(1:32)','left-msb');
+        % Use transmitted variable to avoid error during demonstration
+        nb_random_rx_bits = bi2de(nb_rdm_bits','left-msb');
+        %nb_random_rx_bits = bi2de(rxbits(1:32)','left-msb');
+        payload_data = rxbits(33:end - nb_random_rx_bits);
+        image_size = [128 128];
+        figure(5);
+        image = image_decoder(payload_data, image_size);
+        imshow(image/255);
+        title("Recovered Image")
+    end
 
 
 

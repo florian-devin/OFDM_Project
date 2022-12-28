@@ -110,7 +110,6 @@ switch conf.estimationtype
 
             end
             rxdata = [rxdata rxsymbol(:, block*(conf.nbdatapertrainning+1)+2:(block+1)*(conf.nbdatapertrainning+1))];
-           %rxdata(:,block_idx) = []; %remove training seq
             
         end
 end

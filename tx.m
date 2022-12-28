@@ -70,7 +70,7 @@ if (conf.plotfig == 1)
     subplot(243);
     f = - conf.f_s/2 : conf.f_s/length(txsignal) : conf.f_s/2 - conf.f_s/length(txsignal);
     plot(f,abs(fftshift(fft(txsignal))));
-    title('Spectre of transmitted signal');
+    title('Spectre of transmited signal');
     xlabel('frequency/Hz');
     ylabel('Amplitude');
 end   
